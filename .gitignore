@@ -1,2 +1,6 @@
-apps/.env
+.env
 apps/__pycache__
+.vscode/launch.json
+apps/.vscode/launch.json
+apps/.vscode/settings.json
+apps/tools/__pycache__
