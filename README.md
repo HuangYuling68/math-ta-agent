@@ -4,5 +4,5 @@ An agentic math tutor that fuses Wikipedia retrieval, domain RAG, and SymPy symb
 to deliver step-by-step, verifiable solutions.
 
 ```
-uvicorn apps.demo:app --reload --port 8010
+uvicorn apps.main:app --reload --port 8010
 ```
