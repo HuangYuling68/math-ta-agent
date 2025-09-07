@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MathTA-Agent · Chat</title>
+  <style>
+    :root { --bg:#0b0c0e; --panel:#0f1114; --card:#15171a; --muted:#9aa4af; --text:#e6edf3; --accent:#3b82f6; --ok:#22c55e; --bad:#ef4444; --border:#23262a; }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:920px;margin:0 auto;padding:20px}
+    header{position:sticky;top:0;background:linear-gradient(to bottom, rgba(11,12,14,0.9), rgba(11,12,14,0.5));backdrop-filter:blur(6px);z-index:10;padding:10px 0;}
+    h1{font-size:18px;margin:0 0 4px}
+    .muted{color:var(--muted)}
+    .chat{display:flex;flex-direction:column;gap:14px;margin:12px 0 96px}
+    .msg{display:flex;gap:12px}
+    .bubble{max-width:78%;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--card);white-space:pre-wrap;word-wrap:break-word}
+    .user .bubble{background:#1d2530}
+    .tag{font-size:12px;margin-left:8px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+    .ok{background:rgba(34,197,94,.15);color:var(--ok);border-color:rgba(34,197,94,.35)}
+    .bad{background:rgba(239,68,68,.15);color:var(--bad);border-color:rgba(239,68,68,.35)}
+    details{background:#0f1114;border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-top:10px}
+    summary{cursor:pointer}
+    .footer{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border)}
+    .inputbar{max-width:920px;margin:0 auto;padding:10px;display:grid;grid-template-columns:1fr auto;gap:10px}
+    textarea{width:100%;min-height:56px;max-height:160px;resize:vertical;background:#0f1114;color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+    button{background:var(--accent);border:0;border-radius:12px;color:#fff;padding:10px 16px;font-weight:600;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .toolbar{max-width:920px;margin:0 auto;padding:0 10px 8px;display:flex;justify-content:space-between;align-items:center}
+    .switch{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+    .opt{display:flex;gap:8px;align-items:center}
+    input[type="text"]{background:#0f1114;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:6px 8px;width:120px}
+    .small{font-size:12px}
+    code{background:#0f1114;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+  </style>
+  <!-- MathJax（可选，用于渲染 LaTeX：$...$ 与 $$...$$） --><!-- 启用 MathJax（行内 $...$ / 行间 $$...$$） -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']],
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Math Teaching Assistant Agent <span class="tag">Demo</span></h1>
+      <div class="muted small">输入数学相关问题，提供具备逐步分析、解释的答案。</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="chat" class="chat"></div>
+  </main>
+
+  <div class="footer">
+    <div class="toolbar">
+      <label class="switch"><input id="showSteps" type="checkbox" checked /> 显示推理步骤</label>
+      <div class="opt">
+        <span class="small muted">可选：</span>
+        <input id="task" type="text" placeholder="task: auto/solve/…" />
+        <input id="variable" type="text" placeholder="variable: x" />
+      </div>
+    </div>
+    <div class="inputbar">
+      <textarea id="input" placeholder="提问，例如：differentiate sin(x)*x^2 w.r.t x"></textarea>
+      <button id="send">发送</button>
+    </div>
+  </div>
+
+<script>
+const API = "/solve"; // 与 FastAPI 同域
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const showStepsEl = document.getElementById('showSteps');
+const taskEl = document.getElementById('task');
+const varEl = document.getElementById('variable');
+const storeKey = "mathTA_chat";
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function bubble(role, html, meta){
+  const row = document.createElement('div');
+  row.className = 'msg ' + role;
+  const box = document.createElement('div');
+  box.className = 'bubble';
+  box.innerHTML = html;
+  if(meta && meta.badge){
+    const span = document.createElement('span');
+    span.className = 'tag ' + (meta.badge === 'ok' ? 'ok' : 'bad');
+    span.textContent = meta.badge === 'ok' ? 'verified' : 'not verified';
+    box.prepend(span);
+  }
+  row.appendChild(box);
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+  if (window.MathJax && window.MathJax.typesetPromise) MathJax.typesetPromise([box]);
+}
+
+function stepsDetails(steps){
+  if(!steps || !steps.length) return "";
+  const items = steps.map(s => `<li><b>[${s.id}] ${escapeHtml(s.action)}</b> — ${escapeHtml(s.detail)}</li>`).join("");
+  return `<details open><summary>分步执行记录（${steps.length} 步）</summary><ol>${items}</ol></details>`;
+}
+
+function saveHistory(){
+  const data = chat.innerHTML;
+  localStorage.setItem(storeKey, data);
+}
+function loadHistory(){
+  const data = localStorage.getItem(storeKey);
+  if(data){ chat.innerHTML = data; }
+}
+
+async function send(){
+  const q = input.value.trim();
+  if(!q) return;
+  input.value = "";
+  sendBtn.disabled = true;
+
+  // 显示用户消息
+  bubble('user', escapeHtml(q));
+
+  // 组装请求
+  const payload = { question: q };
+  const t = taskEl.value.trim();
+  const v = varEl.value.trim();
+  if(t) payload.task = t;
+  if(v) payload.variable = v;
+
+  try{
+    const res = await fetch(API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data?.detail || res.statusText);
+
+    const badge = data.verified ? 'ok' : 'bad';
+    let html = `<div><strong>最终答案：</strong></div><div>${escapeHtml(data.final_answer ?? '')}</div>`;
+    if(showStepsEl.checked){
+      html += stepsDetails(data.steps);
+    }
+    bubble('assistant', html, {badge});
+
+  }catch(e){
+    bubble('assistant', `<span class="bad tag">错误</span> ${escapeHtml(e.message||e)}`);
+  }finally{
+    saveHistory();
+    sendBtn.disabled = false;
+  }
+}
+
+sendBtn.addEventListener('click', send);
+input.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    send();
+  }
+});
+
+loadHistory();
+</script>
+</body>
+</html>

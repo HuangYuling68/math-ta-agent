@@ -1,0 +1,10 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+gradio
+sympy>=1.12
+langchain>=0.2,<0.4
+langchain-core>=0.2,<0.4
+pydantic>=2.6
+python-dotenv>=1.0.1
+langchain-openai>=0.1.9
+openai>=1.40.0
