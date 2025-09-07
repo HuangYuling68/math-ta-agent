@@ -1,13 +1,12 @@
 # apps/main.py
 # uvicorn apps.demo:app --reload --port 8010
+import os, json
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-import os, json
-from dotenv import load_dotenv
-from typing import Literal
+from typing import List, Optional, Dict, Any, Literal
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
