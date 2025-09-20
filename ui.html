@@ -77,7 +77,6 @@ const API_HEALTH = "/health";
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
-const showStepsEl = document.getElementById('showSteps');
 const clearBtn = document.getElementById('clearBtn');
 const modeTag = document.getElementById('modeTag');
 const storeKey = "mathTA_agent_chat_v1";
@@ -133,12 +132,19 @@ async function send(){
     if(!res.ok) throw new Error(data?.detail || res.statusText);
 
     const badge = data.verified ? 'ok' : 'bad';
-    const answer = data.explanation || data.final_answer || "";
-    let html = `<div><strong>最终答案：</strong></div><div>${answer}</div>`;
-    if(showStepsEl.checked){
-      html += stepsDetails(data.steps, data.sympy_result);
+    const explanation = data.explanation || "";
+    const finalAnswer = data.final_answer || "";
+
+    let html = "";
+    if (finalAnswer) {
+      html += `<div style="margin-bottom:8px;"><strong>最终答案：</strong>${finalAnswer}</div>`;
     }
+    if (explanation) {
+      html += `<div style="margin-bottom:8px;"><strong>解析：</strong>${explanation}</div>`
+    }
+
     bubble('assistant', html, badge);
+
   }catch(e){
     bubble('assistant', `<span class="tag bad">错误</span> ${escapeHtml(e.message || e)}`);
   }finally{
